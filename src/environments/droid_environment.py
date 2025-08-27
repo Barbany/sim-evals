@@ -469,17 +469,3 @@ class EnvCfg(ManagerBasedRLEnvCfg):
 
     def set_scene(self, scene_name: str):
         self.scene.dynamic_scene(scene_name)
-        self.scene.dynamic_scene(scene_name)
-        self.scene.dynamic_scene(scene_name)
-        self.scene.dynamic_scene(scene_name)
-        self.scene.dynamic_scene(scene_name)
-        self.scene.dynamic_scene(scene_name)
-        self.scene.dynamic_scene(scene_name)
-        self.scene.dynamic_scene(scene_name)
-        self.scene.dynamic_scene(scene_name)
-        self.scene.dynamic_scene(scene_name)
-        self.scene.dynamic_scene(scene_name)
-        self.scene.dynamic_scene(scene_name)
-        self.scene.dynamic_scene(scene_name)
-        self.scene.dynamic_scene(scene_name)
-        self.scene.dynamic_scene(scene_name)
