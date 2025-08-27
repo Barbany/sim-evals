@@ -1,28 +1,28 @@
-import torch
-import isaaclab.sim as sim_utils
-import isaaclab.envs.mdp as mdp
-import numpy as np
-
-from typing import List
 from pathlib import Path
-from pxr import Usd, UsdPhysics
+from typing import List
 
+import isaaclab.envs.mdp as mdp
+import isaaclab.sim as sim_utils
+import numpy as np
+import torch
+from isaaclab.actuators import ImplicitActuatorCfg
+from isaaclab.assets import ArticulationCfg, AssetBaseCfg, RigidObjectCfg
+from isaaclab.envs import ManagerBasedRLEnv, ManagerBasedRLEnvCfg
 from isaaclab.envs.mdp.actions.actions_cfg import BinaryJointPositionActionCfg
 from isaaclab.envs.mdp.actions.binary_joint_actions import BinaryJointPositionAction
 from isaaclab.envs.mdp.actions.joint_actions import JointAction
-from isaaclab.utils import configclass, noise
-from isaaclab.assets import AssetBaseCfg, ArticulationCfg, RigidObjectCfg
-from isaaclab.actuators import ImplicitActuatorCfg
-from isaaclab.managers import SceneEntityCfg
-from isaaclab.scene import InteractiveSceneCfg
-from isaaclab.managers import ObservationGroupCfg as ObsGroup
-from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.managers import EventTermCfg as EventTerm
+from isaaclab.managers import ObservationGroupCfg as ObsGroup
 from isaaclab.managers import ObservationTermCfg as ObsTerm
-from isaaclab.envs import ManagerBasedRLEnv, ManagerBasedRLEnvCfg
+from isaaclab.managers import SceneEntityCfg
+from isaaclab.managers import TerminationTermCfg as DoneTerm
+from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.sensors import CameraCfg
+from isaaclab.utils import configclass, noise
+from pxr import Usd, UsdPhysics
 
 DATA_PATH = Path(__file__).parent / "../../assets"
+
 
 @configclass
 class SceneCfg(InteractiveSceneCfg):
@@ -114,7 +114,9 @@ class SceneCfg(InteractiveSceneCfg):
             vertical_aperture=3.024,
         ),
         offset=CameraCfg.OffsetCfg(
-            pos=(0.05, 0.57, 0.66), rot=(-0.393, -0.195, 0.399, 0.805), convention="opengl"
+            pos=(0.05, 0.57, 0.66),
+            rot=(-0.393, -0.195, 0.399, 0.805),
+            convention="opengl",
         ),
     )
     wrist_cam = CameraCfg(
@@ -129,23 +131,57 @@ class SceneCfg(InteractiveSceneCfg):
             vertical_aperture=3.024,
         ),
         offset=CameraCfg.OffsetCfg(
-            pos=(0.011, -0.031, -0.074), rot=(-0.420, 0.570, 0.576, -0.409), convention="opengl"
+            pos=(0.011, -0.031, -0.074),
+            rot=(-0.420, 0.570, 0.576, -0.409),
+            convention="opengl",
+        ),
+    )
+    external_cam_depth = CameraCfg(
+        prim_path="{ENV_REGEX_NS}/external_cam",
+        height=720,
+        width=1280,
+        data_types=["depth"],
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=2.1,
+            focus_distance=28.0,
+            horizontal_aperture=5.376,
+            vertical_aperture=3.024,
+        ),
+        offset=CameraCfg.OffsetCfg(
+            pos=(0.05, 0.57, 0.66),
+            rot=(-0.393, -0.195, 0.399, 0.805),
+            convention="opengl",
+        ),
+    )
+    wrist_cam_depth = CameraCfg(
+        prim_path="{ENV_REGEX_NS}/robot/robot/Gripper/Robotiq_2F_85/base_link/wrist_cam",
+        height=720,
+        width=1280,
+        data_types=["depth"],
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=2.8,
+            focus_distance=28.0,
+            horizontal_aperture=5.376,
+            vertical_aperture=3.024,
+        ),
+        offset=CameraCfg.OffsetCfg(
+            pos=(0.011, -0.031, -0.074),
+            rot=(-0.420, 0.570, 0.576, -0.409),
+            convention="opengl",
         ),
     )
 
     def dynamic_scene(self, scene_name: str):
         environment_path = DATA_PATH / f"scene{scene_name}.usd"
         scene = AssetBaseCfg(
-                prim_path="{ENV_REGEX_NS}/scene",
-                spawn = sim_utils.UsdFileCfg(
-                    usd_path=str(environment_path),
-                    ),
-                )
+            prim_path="{ENV_REGEX_NS}/scene",
+            spawn=sim_utils.UsdFileCfg(
+                usd_path=str(environment_path),
+            ),
+        )
         self.scene = scene
 
-        stage = Usd.Stage.Open(
-            str(environment_path)
-        )
+        stage = Usd.Stage.Open(str(environment_path))
         scene_prim = stage.GetPrimAtPath("/World")
         children = scene_prim.GetChildren()
 
@@ -158,15 +194,20 @@ class SceneCfg(InteractiveSceneCfg):
             print(f"Found rigid body: {name}")
             pos = child.GetAttribute("xformOp:translate").Get()
             rot = child.GetAttribute("xformOp:orient").Get()
-            rot = (rot.GetReal(), rot.GetImaginary()[0], rot.GetImaginary()[1], rot.GetImaginary()[2])
+            rot = (
+                rot.GetReal(),
+                rot.GetImaginary()[0],
+                rot.GetImaginary()[1],
+                rot.GetImaginary()[2],
+            )
             asset = RigidObjectCfg(
-                        prim_path=f"{{ENV_REGEX_NS}}/scene/{name}",
-                        spawn=None,
-                        init_state=RigidObjectCfg.InitialStateCfg(
-                            pos=pos,
-                            rot=rot,
-                        ),
-                    )
+                prim_path=f"{{ENV_REGEX_NS}}/scene/{name}",
+                spawn=None,
+                init_state=RigidObjectCfg.InitialStateCfg(
+                    pos=pos,
+                    rot=rot,
+                ),
+            )
             setattr(self, name, asset)
 
 
@@ -323,21 +364,38 @@ class ObservationCfg:
             func=gripper_pos, noise=noise.GaussianNoiseCfg(std=0.05), clip=(0, 1)
         )
         external_cam = ObsTerm(
-                func=mdp.observations.image,
-                params={
-                    "sensor_cfg": SceneEntityCfg("external_cam"),
-                    "data_type": "rgb",
-                    "normalize": False,
-                    }
-                )
+            func=mdp.observations.image,
+            params={
+                "sensor_cfg": SceneEntityCfg("external_cam"),
+                "data_type": "rgb",
+                "normalize": False,
+            },
+        )
         wrist_cam = ObsTerm(
-                func=mdp.observations.image,
-                params={
-                    "sensor_cfg": SceneEntityCfg("wrist_cam"),
-                    "data_type": "rgb",
-                    "normalize": False,
-                    }
-                )
+            func=mdp.observations.image,
+            params={
+                "sensor_cfg": SceneEntityCfg("wrist_cam"),
+                "data_type": "rgb",
+                "normalize": False,
+            },
+        )
+        # If normalize = True for depth, it replaces infinity values with zero
+        external_cam_depth = ObsTerm(
+            func=mdp.observations.image,
+            params={
+                "sensor_cfg": SceneEntityCfg("external_cam_depth"),
+                "data_type": "depth",
+                "normalize": False,
+            },
+        )
+        wrist_cam_depth = ObsTerm(
+            func=mdp.observations.image,
+            params={
+                "sensor_cfg": SceneEntityCfg("wrist_cam_depth"),
+                "data_type": "depth",
+                "normalize": False,
+            },
+        )
 
         def __post_init__(self) -> None:
             self.enable_corruption = False
@@ -349,7 +407,9 @@ class ObservationCfg:
 @configclass
 class EventCfg:
     """Configuration for events."""
+
     reset_all = EventTerm(func=mdp.reset_scene_to_default, mode="reset")
+
 
 @configclass
 class CommandsCfg:
@@ -360,10 +420,13 @@ class CommandsCfg:
 class RewardsCfg:
     """Reward terms for the MDP."""
 
+
 @configclass
 class TerminationsCfg:
     """Termination terms for the MDP."""
+
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
+
 
 @configclass
 class CurriculumCfg:
@@ -399,13 +462,24 @@ class EnvCfg(ManagerBasedRLEnvCfg):
         self.sim.physx.gpu_collision_stack_size = 2**30
         self.rerender_on_reset = True
 
-
         # self.sim.render.enable_reflections = False
         # self.sim.render.enable_shadows = False
         # self.sim.render.enable_direct_lighting = False
         # self.sim.render.enable_ambient_occlusion = False
-    
+
     def set_scene(self, scene_name: str):
         self.scene.dynamic_scene(scene_name)
-
-
+        self.scene.dynamic_scene(scene_name)
+        self.scene.dynamic_scene(scene_name)
+        self.scene.dynamic_scene(scene_name)
+        self.scene.dynamic_scene(scene_name)
+        self.scene.dynamic_scene(scene_name)
+        self.scene.dynamic_scene(scene_name)
+        self.scene.dynamic_scene(scene_name)
+        self.scene.dynamic_scene(scene_name)
+        self.scene.dynamic_scene(scene_name)
+        self.scene.dynamic_scene(scene_name)
+        self.scene.dynamic_scene(scene_name)
+        self.scene.dynamic_scene(scene_name)
+        self.scene.dynamic_scene(scene_name)
+        self.scene.dynamic_scene(scene_name)
